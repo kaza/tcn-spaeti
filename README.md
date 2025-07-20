@@ -21,8 +21,15 @@ tcn-spaeti/
 │   │   ├── add-commodity.js # Add new products
 │   │   ├── test-add-commodity.js
 │   │   └── CLAUDE.md        # Module documentation
+│   ├── slot-management/     # Vending machine slot management
+│   │   └── CLAUDE.md        # Module documentation
 │   ├── sales-reports/       # (Coming soon)
 │   └── inventory/           # (Coming soon)
+├── excel-upload/            # Excel import/export functionality
+│   ├── generate-product-import.js    # XLSX format generator
+│   ├── generate-product-import-xls.js # XLS format generator
+│   ├── README.md            # Excel module documentation
+│   └── CLAUDE.md            # AI assistant context
 ├── screenshots/             # Debug screenshots (git-ignored)
 ├── package.json
 ├── README.md
@@ -62,18 +69,37 @@ await addCommodity({
 });
 ```
 
+#### Export Products to Excel
+```bash
+# Generate modern Excel format (.xlsx)
+cd excel-upload
+node generate-product-import.js
+
+# Generate legacy Excel format (.xls)
+node generate-product-import-xls.js
+```
+
+The Excel export:
+- Connects to Azure SQL Server to fetch product data
+- Formats data according to Ourvend's import requirements
+- Generates timestamped files (product-import-YYYYMMDD.xlsx/xls)
+- Preserves exact header formatting required by Ourvend
+
 ## 🔧 Key Features
 
 ### ✅ Implemented
 - Automated login with credential management
 - Navigate to Commodity Management section
 - Add new products with all required fields
+- Bulk modify vending machine slots
+- Excel export from SQL Server (XLSX and XLS formats)
 - Handle iframe-based page structure
 - Screenshot capture for debugging
 
 ### 🚧 Coming Soon
 - Edit existing products
-- Bulk import from CSV/Excel
+- Bulk import to Ourvend from Excel
+- Automated upload after Excel generation
 - Sales report extraction
 - Inventory synchronization
 - Scheduled automation
