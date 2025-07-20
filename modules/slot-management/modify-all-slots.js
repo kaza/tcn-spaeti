@@ -161,16 +161,45 @@ async function modifyAllSlots() {
           return result;
         }
         
-        // Try to set price
-        const priceInputs = modal.querySelectorAll('input[name*="price"], input[name*="Price"], input[placeholder*="price"], input[placeholder*="Price"]');
-        if (priceInputs.length > 0) {
-          const priceInput = priceInputs[0];
+        // Try to set price - look for all number inputs that might be price
+        const allInputs = modal.querySelectorAll('input[type="text"], input[type="number"]');
+        let priceInput = null;
+        
+        // First try specific price selectors
+        priceInput = modal.querySelector('input[name*="price"], input[name*="Price"], input[placeholder*="price"], input[placeholder*="Price"]');
+        
+        // If not found, look for inputs with labels containing price
+        if (!priceInput) {
+          allInputs.forEach(input => {
+            const label = input.parentElement?.textContent || '';
+            if (label.toLowerCase().includes('price') || label.includes('价格')) {
+              priceInput = input;
+            }
+          });
+        }
+        
+        // If still not found, try the first numeric input that's not quantity
+        if (!priceInput) {
+          priceInput = Array.from(allInputs).find(input => 
+            input.type === 'number' && 
+            !input.name?.toLowerCase().includes('quantity') &&
+            !input.name?.toLowerCase().includes('capacity')
+          );
+        }
+        
+        if (priceInput) {
           const newPrice = 10.50 + (slotIndex * 0.50); // Different price for each slot
           priceInput.value = newPrice.toFixed(2);
           priceInput.dispatchEvent(new Event('input', { bubbles: true }));
           priceInput.dispatchEvent(new Event('change', { bubbles: true }));
           result.priceSet = true;
           result.details.price = newPrice.toFixed(2);
+          result.details.priceFieldInfo = {
+            type: priceInput.type,
+            name: priceInput.name,
+            id: priceInput.id,
+            placeholder: priceInput.placeholder
+          };
         }
         
         // Try to change product (if dropdown exists)
@@ -223,8 +252,49 @@ async function modifyAllSlots() {
       
       console.log(`Slot ${i + 1} result:`, modifyResult);
       
-      // Wait for modal to close
+      // Wait for success message and close it
       await slotFrame.waitForTimeout(2000);
+      
+      // Handle success confirmation modal
+      const confirmationClosed = await slotFrame.evaluate(() => {
+        // Look for the success modal with "Edited successfully" message
+        const modals = Array.from(document.querySelectorAll('.modal, [class*="modal"]'));
+        
+        for (const modal of modals) {
+          const style = window.getComputedStyle(modal);
+          if (style.display !== 'none' && style.visibility !== 'hidden') {
+            const modalText = modal.textContent || '';
+            
+            // Check if this is the success confirmation modal
+            if (modalText.includes('Edited successfully') || modalText.includes('Success')) {
+              // Find the Close button with data-dismiss="modal"
+              const closeButton = modal.querySelector('button[data-dismiss="modal"]');
+              if (closeButton) {
+                console.log('Found success confirmation, clicking Close');
+                closeButton.click();
+                return true;
+              }
+              
+              // Alternative: find button with "Close" text
+              const closeButtons = Array.from(modal.querySelectorAll('button')).filter(btn => 
+                btn.textContent.trim() === 'Close'
+              );
+              if (closeButtons.length > 0) {
+                closeButtons[0].click();
+                return true;
+              }
+            }
+          }
+        }
+        return false;
+      });
+      
+      if (confirmationClosed) {
+        console.log('✓ Closed success confirmation');
+      }
+      
+      // Wait for modal to fully close
+      await slotFrame.waitForTimeout(1500);
       
       // Check if modal is still open and try to close it
       await slotFrame.evaluate(() => {
