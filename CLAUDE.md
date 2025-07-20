@@ -109,6 +109,29 @@ await page.screenshot({
 - Password Field: #passWord
 - Dashboard: https://os.ourvend.com/YSTemplet/index
 
+## Critical Discoveries
+
+### 1. Iframes Everywhere
+Most functional pages load inside iframes! Always check for iframes when elements aren't found:
+- Commodity Info: iframe id="54"
+- Look for: `page.frames()` to find all frames
+
+### 2. Multiple Submit Buttons
+Many operations require clicking multiple "Submit" buttons in sequence:
+- Image crop confirmation
+- Save operation
+- Popup dismissals
+Each has different onclick handlers or IDs
+
+### 3. Required Image Upload
+Products REQUIRE an image. Use dummy4.jpg if no real image available.
+
+### 4. Slow Loading
+Everything loads slowly. Always add waits:
+- 5-7 seconds after navigation
+- 3 seconds after button clicks
+- 2 seconds after form fills
+
 ## Future Enhancements
 - API endpoint creation for ERP integration
 - Batch processing for multiple machines
