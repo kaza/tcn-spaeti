@@ -23,7 +23,9 @@ function getOutputFilename() {
   const date = new Date();
   const dateStr = date.getFullYear() + 
     String(date.getMonth() + 1).padStart(2, '0') +
-    String(date.getDate()).padStart(2, '0');
+    String(date.getDate()).padStart(2, '0') + '_' +
+    String(date.getHours()).padStart(2, '0') +
+    String(date.getMinutes()).padStart(2, '0');
   return `product-import-${dateStr}.xls`;
 }
 
@@ -40,7 +42,7 @@ async function generateProductImportXLS() {
     const result = await pool.request().query(`
       SELECT 
         id, 
-        name AS product_name, 
+        LEFT(name, 49) AS product_name, 
         sales_price AS unit_price, 
         purchase_price AS cost_price, 
         'default' AS supplier, 
@@ -55,28 +57,68 @@ async function generateProductImportXLS() {
     
     console.log(`✓ Retrieved ${result.recordset.length} products`);
 
-    // Prepare data for Excel
-    const headers = [
-      'Product barcode*',
-      'Product name*', 
-      'Unit price*',
-      'Cost price',
-      'Supplier*',
-      'Specs',
-      'Type*',
-      'Promotion price',
-      'Member Price',
-      'Discount',
-      'Tax rate'
-    ];
-
-    // Create worksheet data array
-    const wsData = [headers];
+    // Read the template file
+    console.log('Reading template file...');
+    const templatePath = path.join(__dirname, 'BatchImportTemplates.xls');
+    let wb;
     
-    // Add product data
-    console.log('Preparing product data...');
+    try {
+      wb = XLSX.readFile(templatePath);
+      console.log('✓ Template loaded successfully');
+    } catch (err) {
+      console.error('⚠️ Could not read template:', err.message);
+      // Fall back to creating new workbook if template not found
+      console.log('Creating new workbook...');
+      wb = XLSX.utils.book_new();
+    }
+
+    // Get the first worksheet or create one
+    let ws;
+    const sheetName = wb.SheetNames[0] || 'Products';
+    
+    if (wb.SheetNames.length > 0) {
+      ws = wb.Sheets[sheetName];
+      console.log(`✓ Using existing worksheet: ${sheetName}`);
+      
+      // Get the range of the existing sheet
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      
+      // Clear all data rows (keep header row)
+      for (let row = range.e.r; row > 0; row--) {
+        for (let col = 0; col <= range.e.c; col++) {
+          const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+          delete ws[cellAddress];
+        }
+      }
+      
+      // Update the range to only include the header
+      ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 0, c: 10 } });
+    } else {
+      // Create new worksheet if template is empty
+      console.log('Creating new worksheet...');
+      const headers = [
+        'Product barcode*',
+        'Product name*', 
+        'Unit price*',
+        'Cost price',
+        'Supplier*',
+        'Specs',
+        'Type*',
+        'Promotion price',
+        'Member Price',
+        'Discount',
+        'Tax rate'
+      ];
+      ws = XLSX.utils.aoa_to_sheet([headers]);
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    }
+
+    // Add product data starting from row 2 (row 1 is header)
+    console.log('Adding product data...');
+    let rowIndex = 1; // Start after header
+    
     result.recordset.forEach(row => {
-      wsData.push([
+      const rowData = [
         row.id,
         row.product_name || '',
         row.unit_price || 0,
@@ -88,13 +130,22 @@ async function generateProductImportXLS() {
         row.member_price || 0,
         row.discount || 0,
         row.tax_rate || 0
-      ]);
+      ];
+      
+      // Add each cell individually
+      rowData.forEach((value, colIndex) => {
+        const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex });
+        ws[cellAddress] = { v: value, t: typeof value === 'number' ? 'n' : 's' };
+      });
+      
+      rowIndex++;
     });
-
-    // Create workbook
-    console.log('Creating XLS workbook...');
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    
+    // Update the worksheet range
+    ws['!ref'] = XLSX.utils.encode_range({ 
+      s: { r: 0, c: 0 }, 
+      e: { r: rowIndex - 1, c: 10 } 
+    });
 
     // Set column widths
     const colWidths = [
@@ -111,9 +162,6 @@ async function generateProductImportXLS() {
       { wch: 10 }  // Tax rate
     ];
     ws['!cols'] = colWidths;
-
-    // Add worksheet to workbook
-    XLSX.utils.book_append_sheet(wb, ws, 'Products');
 
     // Save the file
     const outputPath = path.join(__dirname, getOutputFilename());

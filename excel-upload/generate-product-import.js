@@ -40,7 +40,7 @@ async function generateProductImport() {
     const result = await pool.request().query(`
       SELECT 
         id, 
-        name AS product_name, 
+        LEFT(name, 49) AS product_name, 
         sales_price AS unit_price, 
         purchase_price AS cost_price, 
         'default' AS supplier, 
