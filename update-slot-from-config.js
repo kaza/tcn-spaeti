@@ -89,7 +89,32 @@ class SlotUpdater {
     });
     
     console.log('✓ Query executed');
-    await this.slotFrame.waitForTimeout(5000);
+    console.log('Waiting for slots to load...');
+    await this.slotFrame.waitForTimeout(8000);
+    
+    // Debug: Check what's on the page
+    const pageInfo = await this.slotFrame.evaluate(() => {
+      const allButtons = Array.from(document.querySelectorAll('button, a'));
+      const editButtons = allButtons.filter(btn => btn.textContent?.trim() === 'Edit').length;
+      const anySlotText = document.body.textContent.includes('Slot number');
+      const firstFewSlots = [];
+      
+      // Look for slot text
+      const allText = Array.from(document.querySelectorAll('*')).filter(el => 
+        el.textContent?.includes('Slot number') && !el.children.length
+      );
+      
+      allText.slice(0, 5).forEach(el => {
+        firstFewSlots.push(el.textContent.trim());
+      });
+      
+      return { editButtons, anySlotText, firstFewSlots };
+    });
+    console.log(`Page loaded with ${pageInfo.editButtons} Edit buttons`);
+    console.log(`Contains "Slot number": ${pageInfo.anySlotText}`);
+    if (pageInfo.firstFewSlots.length > 0) {
+      console.log('First few slots found:', pageInfo.firstFewSlots);
+    }
   }
 
   async selectDropdownOption(dropdownIndex, optionText) {
@@ -119,19 +144,82 @@ class SlotUpdater {
     console.log(`\n=== OPENING SLOT ${slotNumber} FOR EDITING ===`);
     
     const slotClicked = await this.slotFrame.evaluate((slotNum) => {
-      const editButtons = Array.from(document.querySelectorAll('button, a')).filter(btn => 
-        btn.textContent?.trim() === 'Edit'
-      );
+      // Find all elements containing text
+      const allElements = Array.from(document.querySelectorAll('*'));
       
-      if (slotNum === 1 && editButtons.length > 0) {
-        editButtons[0].click();
+      // Look for "Slot numberX" text
+      const targetText = `Slot number${slotNum}`;
+      console.log(`Looking for: "${targetText}"`);
+      
+      // Find the element containing our slot text
+      let slotContainer = null;
+      for (const element of allElements) {
+        const text = element.textContent || '';
+        // Check if this element contains our slot text but not as part of a larger number
+        if (text.includes(targetText) && 
+            !text.includes(`Slot number${slotNum}0`) && 
+            !text.includes(`Slot number${slotNum}1`) &&
+            !text.includes(`Slot number${slotNum}2`) &&
+            !text.includes(`Slot number${slotNum}3`) &&
+            !text.includes(`Slot number${slotNum}4`) &&
+            !text.includes(`Slot number${slotNum}5`) &&
+            !text.includes(`Slot number${slotNum}6`) &&
+            !text.includes(`Slot number${slotNum}7`) &&
+            !text.includes(`Slot number${slotNum}8`) &&
+            !text.includes(`Slot number${slotNum}9`)) {
+          
+          // Check if this is the smallest container with the text
+          const childrenWithText = Array.from(element.children).filter(child => 
+            child.textContent?.includes(targetText)
+          );
+          
+          if (childrenWithText.length === 0) {
+            slotContainer = element;
+            break;
+          }
+        }
+      }
+      
+      if (!slotContainer) {
+        console.log(`Could not find container for ${targetText}`);
+        return false;
+      }
+      
+      console.log(`Found slot container for ${targetText}`);
+      
+      // Now find the Edit button within or near this container
+      let container = slotContainer;
+      let depth = 0;
+      let editButton = null;
+      
+      while (container && depth < 10) {
+        // Look for Edit button within this container
+        const buttons = Array.from(container.querySelectorAll('button, a')).filter(btn => 
+          btn.textContent?.trim() === 'Edit'
+        );
+        
+        if (buttons.length > 0) {
+          editButton = buttons[0];
+          break;
+        }
+        
+        // Go up to parent
+        container = container.parentElement;
+        depth++;
+      }
+      
+      if (editButton) {
+        console.log(`Found Edit button for ${targetText}`);
+        editButton.click();
         return true;
       }
+      
+      console.log(`Could not find Edit button for ${targetText}`);
       return false;
     }, slotNumber);
     
     if (!slotClicked) {
-      throw new Error(`Could not find Slot ${slotNumber}`);
+      throw new Error(`Could not find Slot number${slotNumber}`);
     }
     
     console.log(`✓ Opened Slot ${slotNumber} for editing`);
@@ -167,12 +255,36 @@ class SlotUpdater {
         const items = document.querySelectorAll('.dropdown-menu.open li a, .dropdown-menu.show li a');
         console.log(`Found ${items.length} dropdown items`);
         
+        let selectedItem = null;
         for (const item of items) {
           if (item.textContent.includes(expectedProductName)) {
             console.log(`Found product: ${item.textContent}`);
+            selectedItem = item;
             item.click();
-            return { success: true, changed: true, oldProduct: currentProduct, newProduct: expectedProductName };
+            
+            // Force Bootstrap Select to update
+            const event = new Event('click', { bubbles: true });
+            item.dispatchEvent(event);
+            
+            // Also try to find and update the select element if it exists
+            const hiddenSelect = modal.querySelector('select');
+            if (hiddenSelect) {
+              // Find the option that matches
+              for (let i = 0; i < hiddenSelect.options.length; i++) {
+                if (hiddenSelect.options[i].text.includes(expectedProductName)) {
+                  hiddenSelect.selectedIndex = i;
+                  hiddenSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                  break;
+                }
+              }
+            }
+            
+            break;
           }
+        }
+        
+        if (selectedItem) {
+          return { success: true, changed: true, oldProduct: currentProduct, newProduct: expectedProductName };
         }
         
         return { success: false, error: `Could not find product: ${expectedProductName}` };
@@ -183,7 +295,29 @@ class SlotUpdater {
     
     if (productChangeResult.changed) {
       console.log(`✓ Changed product from "${productChangeResult.oldProduct}" to "${productChangeResult.newProduct}"`);
-      await this.slotFrame.waitForTimeout(2000);
+      // Wait longer for dropdown to update
+      await this.slotFrame.waitForTimeout(3000);
+      
+      // Verify the product actually changed
+      const verifyResult = await this.slotFrame.evaluate(() => {
+        const modal = Array.from(document.querySelectorAll('.modal, [class*="modal"]')).find(m => {
+          const style = window.getComputedStyle(m);
+          return style.display !== 'none' && style.visibility !== 'hidden';
+        });
+        
+        if (!modal) return { error: 'Modal not found' };
+        
+        const productDropdown = modal.querySelector('button.dropdown-toggle');
+        return {
+          currentText: productDropdown?.textContent?.trim() || '',
+          innerHTML: productDropdown?.innerHTML || ''
+        };
+      });
+      
+      console.log('After change verification:');
+      console.log(`  Button text: "${verifyResult.currentText}"`);
+      console.log(`  Button HTML: ${verifyResult.innerHTML.substring(0, 100)}...`);
+      
     } else if (productChangeResult.success && !productChangeResult.changed) {
       console.log(`✓ Product already correct: "${productChangeResult.currentProduct}"`);
     } else {
@@ -197,82 +331,100 @@ class SlotUpdater {
     console.log('\n=== VALIDATING OTHER FIELDS ===');
     
     const validationResult = await this.slotFrame.evaluate((expectedConfig) => {
-      const modal = Array.from(document.querySelectorAll('.modal, [class*="modal"]')).find(m => {
+      // First, let's see all modals
+      const allModals = document.querySelectorAll('.modal, [class*="modal"]');
+      console.log(`Total modals found: ${allModals.length}`);
+      
+      // Find the edit modal (not the success modal)
+      let modal = null;
+      for (const m of allModals) {
         const style = window.getComputedStyle(m);
-        return style.display !== 'none' && style.visibility !== 'hidden';
-      });
+        if (style.display !== 'none' && style.visibility !== 'hidden') {
+          const modalText = m.textContent || '';
+          // Skip success modals
+          if (!modalText.includes('Edited successfully') && !modalText.includes('Message Box')) {
+            // Check if it has form fields
+            const hasInputs = m.querySelectorAll('input').length > 0;
+            if (hasInputs) {
+              modal = m;
+              console.log('Found edit modal with inputs');
+              break;
+            }
+          }
+        }
+      }
 
-      if (!modal) return { allCorrect: false, differences: ['Modal not found'], fieldValues: {} };
+      if (!modal) {
+        console.log('Could not find edit modal with inputs');
+        return { allCorrect: false, differences: ['Edit modal not found'], fieldValues: {} };
+      }
 
       const differences = [];
       const fieldValues = {};
       let allCorrect = true;
 
-      // Helper function to find input
-      const findInput = (selectors) => {
-        for (const selector of selectors) {
-          const input = modal.querySelector(selector);
-          if (input) return input;
-        }
-        return null;
-      };
-
-      // Record current product
+      // Record current product - get the first dropdown (product dropdown)
       const productDropdown = modal.querySelector('button.dropdown-toggle');
       const currentProduct = productDropdown?.textContent?.trim() || '';
       fieldValues.productName = currentProduct;
+      console.log(`Current product in dropdown: "${currentProduct}"`);
 
-      // Field mappings
+      // Field mappings - use the exact IDs we know
+      const machinePrice = modal.querySelector('#SiPrice');
+      const userDefinedPrice = modal.querySelector('#SiCustomPrice');
+      
+      console.log(`Machine Price input found: ${!!machinePrice}, current value: "${machinePrice?.value}"`);
+      console.log(`User-defined Price input found: ${!!userDefinedPrice}, current value: "${userDefinedPrice?.value}"`);
+      
       const fieldMappings = [
         { 
           name: 'Machine Price', 
           value: expectedConfig.machinePrice, 
-          selectors: ['input[name*="MachinePrice"]', 'input[name*="machinePrice"]', 'input[placeholder*="Machine Price"]']
+          input: machinePrice
         },
         { 
           name: 'User-defined price', 
           value: expectedConfig.userDefinedPrice, 
-          selectors: ['input[name*="UserDefinedPrice"]', 'input[name*="userDefinedPrice"]', 'input[placeholder*="User-defined price"]']
-        },
-        { 
-          name: 'Capacity', 
-          value: expectedConfig.capacity, 
-          selectors: ['input[name*="Capacity"]', 'input[name*="capacity"]', 'input[placeholder*="Capacity"]']
-        },
-        { 
-          name: 'Existing', 
-          value: expectedConfig.existing, 
-          selectors: ['input[name*="Existing"]', 'input[name*="existing"]', 'input[placeholder*="Existing"]']
-        },
-        { 
-          name: 'WeChat discount', 
-          value: expectedConfig.weChatDiscount, 
-          selectors: ['input[name*="WeChatDiscount"]', 'input[name*="weChatDiscount"]', 'input[placeholder*="WeChat discount"]']
-        },
-        { 
-          name: 'Alipay discount', 
-          value: expectedConfig.alipayDiscount, 
-          selectors: ['input[name*="AlipayDiscount"]', 'input[name*="alipayDiscount"]', 'input[placeholder*="Alipay discount"]']
-        },
-        { 
-          name: 'ID card discount', 
-          value: expectedConfig.idCardDiscount, 
-          selectors: ['input[name*="IDCardDiscount"]', 'input[name*="idCardDiscount"]', 'input[placeholder*="ID card discount"]']
-        },
-        { 
-          name: 'Alerting quantity', 
-          value: expectedConfig.alertingQuantity, 
-          selectors: ['input[name*="AlertingQuantity"]', 'input[name*="alertingQuantity"]', 'input[placeholder*="Alerting quantity"]']
+          input: userDefinedPrice
         }
       ];
 
       // Find all inputs in modal for debugging
       const allInputs = modal.querySelectorAll('input');
       console.log(`Found ${allInputs.length} inputs in modal`);
+      
+      // Debug: log all input details
+      allInputs.forEach((input, idx) => {
+        const style = window.getComputedStyle(input);
+        const isVisible = style.display !== 'none' && style.visibility !== 'hidden';
+        console.log(`Input ${idx}: name="${input.name}", id="${input.id}", placeholder="${input.placeholder}", type="${input.type}", value="${input.value}", visible=${isVisible}`);
+      });
+
+      // Also look for inputs by traversing from labels
+      console.log('\n=== CHECKING LABELS AND THEIR INPUTS ===');
+      const allLabels = modal.querySelectorAll('label');
+      allLabels.forEach((label, idx) => {
+        const labelText = label.textContent?.trim() || '';
+        const forAttr = label.getAttribute('for');
+        let associatedInput = null;
+        
+        if (forAttr) {
+          associatedInput = modal.querySelector(`#${forAttr}`);
+        } else {
+          // Check next sibling or within parent
+          associatedInput = label.nextElementSibling || label.parentElement?.querySelector('input');
+        }
+        
+        if (associatedInput) {
+          console.log(`Label ${idx}: "${labelText}" -> Input: name="${associatedInput.name}", value="${associatedInput.value}"`);
+        } else {
+          console.log(`Label ${idx}: "${labelText}" -> No associated input found`);
+        }
+      });
 
       // Check and update each field
       for (const field of fieldMappings) {
-        const input = findInput(field.selectors);
+        const input = field.input;
         if (input) {
           const currentValue = input.value;
           const expectedValue = field.value.toString();
@@ -286,6 +438,7 @@ class SlotUpdater {
             input.value = expectedValue;
             input.dispatchEvent(new Event('input', { bubbles: true }));
             input.dispatchEvent(new Event('change', { bubbles: true }));
+            console.log(`Updated ${field.name} from "${currentValue}" to "${expectedValue}"`);
           }
         } else {
           differences.push(`${field.name}: input not found`);
@@ -429,13 +582,13 @@ class SlotUpdater {
     
     if (closeClicked.clicked) {
       console.log(`✓ Clicked Close button: "${closeClicked.buttonText}"`);
-      console.log('Waiting 20 seconds after clicking Close...');
-      await this.slotFrame.waitForTimeout(20000);
+      console.log('Waiting 2 seconds after clicking Close...');
+      await this.slotFrame.waitForTimeout(2000);
       await this.takeScreenshot('after_close_button');
     } else {
       console.log('⚠️ Could not find success message Close button');
-      console.log('Waiting 20 seconds to check for any modals...');
-      await this.slotFrame.waitForTimeout(20000);
+      console.log('Waiting 2 seconds to check for any modals...');
+      await this.slotFrame.waitForTimeout(2000);
     }
     
     return closeClicked;
@@ -496,15 +649,18 @@ class SlotUpdater {
     await this.browser.close();
   }
 
-  async updateSlot() {
+  async setupBrowserAndNavigate() {
+    await this.initialize();
+    await this.loginToSystem();
+    await this.navigateToSlotManagement();
+    await this.selectMachine();
+  }
+
+  async updateSingleSlot() {
     try {
-      await this.initialize();
-      await this.loginToSystem();
-      await this.navigateToSlotManagement();
-      await this.selectMachine();
       await this.openSlotForEditing(this.config.slotNumber);
       
-      await this.takeScreenshot('slot_before_validation');
+      await this.takeScreenshot(`slot_${this.config.slotNumber}_before_validation`);
       
       // Update product if needed
       await this.changeProductIfNeeded(this.config.productName);
@@ -512,7 +668,7 @@ class SlotUpdater {
       // Validate and update other fields
       const validationResult = await this.validateAndUpdateFormFields(this.config);
       
-      await this.takeScreenshot('slot_after_validation');
+      await this.takeScreenshot(`slot_${this.config.slotNumber}_after_validation`);
       
       // Click appropriate button based on validation
       if (validationResult.allCorrect) {
@@ -528,14 +684,10 @@ class SlotUpdater {
         }
       }
       
-      await this.takeScreenshot('slot_final_state');
-      await this.closeBrowser();
+      await this.takeScreenshot(`slot_${this.config.slotNumber}_final_state`);
       
     } catch (error) {
-      console.error('Error:', error);
-      if (this.browser) {
-        await this.browser.close();
-      }
+      // Re-throw the error to be handled by the main loop
       throw error;
     }
   }
@@ -545,13 +697,81 @@ class SlotUpdater {
 async function main() {
   // Load configuration
   const configurations = JSON.parse(fs.readFileSync('slot-configurations.json', 'utf8'));
-  const config = configurations[0]; // Get first configuration
   
   console.log('=== SLOT UPDATE CONFIGURATION ===');
-  console.log(JSON.stringify(config, null, 2));
+  console.log(`Total slots to update: ${configurations.length}`);
+  console.log('');
   
-  const updater = new SlotUpdater(config);
-  await updater.updateSlot();
+  const results = {
+    successful: [],
+    failed: []
+  };
+  
+  // Create a single updater instance for browser setup
+  const firstConfig = configurations[0];
+  const browserController = new SlotUpdater(firstConfig);
+  
+  try {
+    // Setup browser once and navigate to the correct page
+    console.log('=== SETTING UP BROWSER AND NAVIGATION ===');
+    await browserController.setupBrowserAndNavigate();
+    console.log('✓ Browser ready, machine selected');
+    
+    // Process each slot configuration
+    for (const config of configurations) {
+      console.log(`\n${'='.repeat(60)}`);
+      console.log(`Processing Slot ${config.slotNumber}: ${config.productName}`);
+      console.log('='.repeat(60));
+      
+      try {
+        // Create updater with current config but reuse the same browser/page/frame
+        const slotUpdater = new SlotUpdater(config);
+        slotUpdater.browser = browserController.browser;
+        slotUpdater.page = browserController.page;
+        slotUpdater.slotFrame = browserController.slotFrame;
+        
+        await slotUpdater.updateSingleSlot();
+        results.successful.push(config.slotNumber);
+        console.log(`✓ Successfully updated Slot ${config.slotNumber}`);
+        
+        // Wait a bit between slots to let the page settle
+        await slotUpdater.page.waitForTimeout(2000);
+        
+      } catch (error) {
+        console.error(`❌ Failed to update Slot ${config.slotNumber}: ${error.message}`);
+        results.failed.push({ slot: config.slotNumber, error: error.message });
+        console.log('Continuing with next slot...');
+        
+        // Wait a bit before trying next slot
+        await browserController.page.waitForTimeout(2000);
+      }
+    }
+    
+    // Summary
+    console.log(`\n${'='.repeat(60)}`);
+    console.log('SUMMARY');
+    console.log('='.repeat(60));
+    console.log(`✓ Successfully updated: ${results.successful.length} slots`);
+    if (results.successful.length > 0) {
+      console.log(`  Slots: ${results.successful.join(', ')}`);
+    }
+    console.log(`❌ Failed: ${results.failed.length} slots`);
+    if (results.failed.length > 0) {
+      results.failed.forEach(f => {
+        console.log(`  Slot ${f.slot}: ${f.error}`);
+      });
+    }
+    
+    // Close browser at the end
+    await browserController.closeBrowser();
+    
+  } catch (error) {
+    console.error('Fatal error during setup:', error);
+    if (browserController.browser) {
+      await browserController.browser.close();
+    }
+    throw error;
+  }
 }
 
 // Run if called directly
