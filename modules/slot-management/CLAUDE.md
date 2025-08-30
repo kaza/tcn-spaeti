@@ -118,31 +118,52 @@ This module handles slot management for vending machines - assigning products to
 - Both fields successfully update with new values
 
 ### Batch Processing
-- Single login and navigation, then processes all slots
+- Multi-machine support with independent browser sessions per machine
 - Handles missing slots (e.g., slots 2, 4) without stopping
-- Provides summary of successful and failed updates
+- Provides per-machine summaries and overall summary
+- Continues to next machine even if current machine fails
 
 ## Working Scripts
 
 ### Main Implementation
-- `update-slot-from-config.js` - Complete slot update system with JSON configuration
-- `slot-configurations.json` - Configuration file with slot details
+- `update-slot-from-config.js` - Complete slot update system with multi-machine support
+- `slot-configurations.json` - Configuration file with machines and their slot details
 
-### Configuration Format
+### Configuration Format (Multi-Machine Support)
 ```json
-{
-  "slotNumber": 1,
-  "productName": "Red Bull Energy Drink",
-  "machinePrice": 3,
-  "userDefinedPrice": 3,
-  "capacity": 199,
-  "existing": 199,
-  "weChatDiscount": 100,
-  "alipayDiscount": 100,
-  "idCardDiscount": 100,
-  "alertingQuantity": ""
-}
+[
+  {
+    "machineGrouping": "1050",
+    "machineId": "Cips (5) 250306",
+    "slots": [
+      {
+        "slotNumber": 1,
+        "productName": "Red Bull Energy Drink",
+        "machinePrice": 3.5,
+        "userDefinedPrice": 3.5,
+        "capacity": 199,
+        "existing": 199,
+        "weChatDiscount": 100,
+        "alipayDiscount": 100,
+        "idCardDiscount": 100,
+        "alertingQuantity": ""
+      }
+    ]
+  },
+  {
+    "machineGrouping": "1050",
+    "machineId": "Slatkisi (5) 2503050187",
+    "slots": [...]
+  }
+]
 ```
+
+### Multi-Machine Features
+- Processes multiple machines in sequence
+- Each machine gets its own browser session
+- Automatic machine selection using grouping and ID
+- Continues processing even if one machine fails
+- Per-machine and overall summaries
 
 ## Known Issues & Workarounds
 
@@ -154,6 +175,17 @@ This module handles slot management for vending machines - assigning products to
 
 ## Tested Configurations
 - Machine Grouping: 1050
-- Machine ID: Cips (5) 250306
-- Working slots: 1, 3, 5, 7, 9
-- Non-existent slots: 2, 4 (handled gracefully)
+- Machine IDs tested:
+  - Cips (5) 250306 - Working slots: 1, 3, 5
+  - Slatkisi (5) 2503050187 - Working slots: 1, 2, 3
+- Non-existent slots: handled gracefully
+
+## AI Assistant Note
+When running `update-slot-from-config.js` in the future, consider running it in background mode or with a longer timeout since processing multiple machines can take several minutes:
+```bash
+# Run with extended timeout
+timeout 300 node update-slot-from-config.js
+
+# Or run in background
+nohup node update-slot-from-config.js > slot-update.log 2>&1 &
+```

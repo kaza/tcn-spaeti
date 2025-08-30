@@ -10,22 +10,33 @@ The `update-slot-from-config.js` script automates the process of updating vendin
 
 ## Usage
 
-### 1. Configure Slots
-Edit `slot-configurations.json` with your desired slot configurations:
+### 1. Configure Machines and Slots
+Edit `slot-configurations.json` with your machines and their slot configurations:
 
 ```json
 [
   {
-    "slotNumber": 1,
-    "productName": "Red Bull Energy Drink",
-    "machinePrice": 3,
-    "userDefinedPrice": 3,
-    "capacity": 199,
-    "existing": 199,
-    "weChatDiscount": 100,
-    "alipayDiscount": 100,
-    "idCardDiscount": 100,
-    "alertingQuantity": ""
+    "machineGrouping": "1050",
+    "machineId": "Cips (5) 250306",
+    "slots": [
+      {
+        "slotNumber": 1,
+        "productName": "Red Bull Energy Drink",
+        "machinePrice": 3.5,
+        "userDefinedPrice": 3.5,
+        "capacity": 199,
+        "existing": 199,
+        "weChatDiscount": 100,
+        "alipayDiscount": 100,
+        "idCardDiscount": 100,
+        "alertingQuantity": ""
+      }
+    ]
+  },
+  {
+    "machineGrouping": "1050",
+    "machineId": "Slatkisi (5) 2503050187",
+    "slots": [...]
   }
 ]
 ```
@@ -38,19 +49,27 @@ node update-slot-from-config.js
 
 ### 3. What the Script Does
 1. Logs into Ourvend automatically
-2. Navigates to Slot Management
-3. Selects the configured machine (default: 1050 / Cips (5) 250306)
-4. For each slot in the configuration:
-   - Finds the slot by "Slot numberX" text
-   - Opens the edit modal
-   - Changes the product (if different)
-   - Updates Machine Price and User-defined Price
-   - Saves changes
-   - Handles success confirmation
-5. Provides a summary of successful and failed updates
+2. For each machine in the configuration:
+   - Navigates to Slot Management
+   - Selects the machine using machineGrouping and machineId
+   - For each slot in that machine:
+     - Finds the slot by "Slot numberX" text
+     - Opens the edit modal
+     - Changes the product (if different)
+     - Updates Machine Price and User-defined Price
+     - Saves changes
+     - Handles success confirmation
+   - Provides a summary for that machine
+3. Provides an overall summary of all machines and slots
 
 ## Configuration Fields
 
+### Machine Level
+- **machineGrouping**: The machine group (e.g., "1050")
+- **machineId**: The specific machine identifier (e.g., "Cips (5) 250306")
+- **slots**: Array of slot configurations for this machine
+
+### Slot Level
 - **slotNumber**: The slot number to update (e.g., 1, 3, 5)
 - **productName**: Product name to assign to the slot
 - **machinePrice**: Price displayed on the machine (#SiPrice field)
@@ -70,7 +89,16 @@ node update-slot-from-config.js
 ## Expected Output
 ```
 === SLOT UPDATE CONFIGURATION ===
-Total slots to update: 5
+Total machines to process: 2
+  - Cips (5) 250306: 3 slots
+  - Slatkisi (5) 2503050187: 3 slots
+Total slots to update: 6
+
+======================================================================
+PROCESSING MACHINE: Cips (5) 250306
+Machine Grouping: 1050
+Slots to update: 1, 3, 5
+======================================================================
 
 === SETTING UP BROWSER AND NAVIGATION ===
 ✓ Logged in successfully
@@ -79,19 +107,40 @@ Total slots to update: 5
 ✓ Browser ready, machine selected
 
 Processing Slot 1: Red Bull Energy Drink
-✓ Opened Slot 1 for editing
-✓ Changed product from "1050" to "Red Bull Energy Drink"
-✓ All values are correct, clicking Close button
 ✓ Successfully updated Slot 1
 
-============================================================
-SUMMARY
-============================================================
+--- Machine Cips (5) 250306 Summary ---
 ✓ Successfully updated: 3 slots
   Slots: 1, 3, 5
-❌ Failed: 2 slots
-  Slot 2: Could not find Slot number2
-  Slot 4: Could not find Slot number4
+❌ Failed: 0 slots
+
+======================================================================
+PROCESSING MACHINE: Slatkisi (5) 2503050187
+Machine Grouping: 1050
+Slots to update: 1, 2, 3
+======================================================================
+
+=== SETTING UP BROWSER AND NAVIGATION ===
+✓ Browser ready, machine selected
+
+Processing Slot 1: Velo Breezy Mango Original Slim
+✓ Successfully updated Slot 1
+
+--- Machine Slatkisi (5) 2503050187 Summary ---
+✓ Successfully updated: 3 slots
+  Slots: 1, 2, 3
+❌ Failed: 0 slots
+
+======================================================================
+OVERALL SUMMARY
+======================================================================
+Total machines processed: 2
+✓ Total slots successfully updated: 6
+❌ Total slots failed: 0
+
+By Machine:
+  Cips (5) 250306: 3 successful, 0 failed
+  Slatkisi (5) 2503050187: 3 successful, 0 failed
 ```
 
 ## Error Handling
@@ -99,11 +148,13 @@ SUMMARY
 - Network errors will cause the script to exit
 - Login failures will prevent the script from running
 
-## Customization
-To use a different machine, modify the `selectMachine` call in the script:
-```javascript
-await this.selectMachine('YourGrouping', 'Your Machine ID');
-```
+## Multiple Machine Support
+The script now supports updating multiple machines in a single run. Each machine:
+- Gets its own browser session and login
+- Is selected using its machineGrouping and machineId
+- Processes all configured slots
+- Reports success/failure per machine
+- Continues to next machine even if current machine fails
 
 ## Troubleshooting
 1. **Script can't find slots**: Ensure the slot numbers exist in the selected machine

@@ -640,78 +640,138 @@ class SlotUpdater {
 // Main execution
 async function main() {
   // Load configuration
-  const configurations = JSON.parse(fs.readFileSync('slot-configurations.json', 'utf8'));
+  const machineConfigurations = JSON.parse(fs.readFileSync('slot-configurations.json', 'utf8'));
   
   console.log('=== SLOT UPDATE CONFIGURATION ===');
-  console.log(`Total slots to update: ${configurations.length}`);
+  console.log(`Total machines to process: ${machineConfigurations.length}`);
+  
+  let totalSlots = 0;
+  machineConfigurations.forEach(machine => {
+    totalSlots += machine.slots.length;
+    console.log(`  - ${machine.machineId}: ${machine.slots.length} slots`);
+  });
+  console.log(`Total slots to update: ${totalSlots}`);
   console.log('');
   
-  const results = {
-    successful: [],
-    failed: []
+  const overallResults = {
+    byMachine: {},
+    totalSuccessful: 0,
+    totalFailed: 0
   };
   
-  // Create a single updater instance for browser setup
-  const firstConfig = configurations[0];
-  const browserController = new SlotUpdater(firstConfig);
+  let browserController = null;
   
   try {
-    // Setup browser once and navigate to the correct page
-    console.log('=== SETTING UP BROWSER AND NAVIGATION ===');
-    await browserController.setupBrowserAndNavigate();
-    console.log('✓ Browser ready, machine selected');
-    
-    // Process each slot configuration
-    for (const config of configurations) {
-      console.log(`\n${'='.repeat(60)}`);
-      console.log(`Processing Slot ${config.slotNumber}: ${config.productName}`);
-      console.log('='.repeat(60));
+    // Process each machine
+    for (const machineConfig of machineConfigurations) {
+      console.log(`\n${'='.repeat(70)}`);
+      console.log(`PROCESSING MACHINE: ${machineConfig.machineId}`);
+      console.log(`Machine Grouping: ${machineConfig.machineGrouping}`);
+      console.log(`Slots to update: ${machineConfig.slots.map(s => s.slotNumber).join(', ')}`);
+      console.log('='.repeat(70));
+      
+      const machineResults = {
+        successful: [],
+        failed: []
+      };
+      
+      // Create a new browser controller for each machine
+      // This ensures clean navigation to each machine
+      if (browserController) {
+        await browserController.closeBrowser();
+      }
+      
+      browserController = new SlotUpdater(machineConfig.slots[0]);
       
       try {
-        // Create updater with current config but reuse the same browser/page/frame
-        const slotUpdater = new SlotUpdater(config);
-        slotUpdater.browser = browserController.browser;
-        slotUpdater.page = browserController.page;
-        slotUpdater.slotFrame = browserController.slotFrame;
+        // Setup browser and navigate to the specific machine
+        console.log('\n=== SETTING UP BROWSER AND NAVIGATION ===');
+        await browserController.initialize();
+        await browserController.loginToSystem();
+        await browserController.navigateToSlotManagement();
+        await browserController.selectMachine(machineConfig.machineGrouping, machineConfig.machineId);
+        console.log('✓ Browser ready, machine selected');
         
-        await slotUpdater.updateSingleSlot();
-        results.successful.push(config.slotNumber);
-        console.log(`✓ Successfully updated Slot ${config.slotNumber}`);
-        
-        // Wait a bit between slots to let the page settle
-        await slotUpdater.page.waitForTimeout(1000);
+        // Process each slot for this machine
+        for (const slotConfig of machineConfig.slots) {
+          console.log(`\n${'='.repeat(60)}`);
+          console.log(`Processing Slot ${slotConfig.slotNumber}: ${slotConfig.productName}`);
+          console.log('='.repeat(60));
+          
+          try {
+            // Create updater with current config but reuse the same browser/page/frame
+            const slotUpdater = new SlotUpdater(slotConfig);
+            slotUpdater.browser = browserController.browser;
+            slotUpdater.page = browserController.page;
+            slotUpdater.slotFrame = browserController.slotFrame;
+            
+            await slotUpdater.updateSingleSlot();
+            machineResults.successful.push(slotConfig.slotNumber);
+            console.log(`✓ Successfully updated Slot ${slotConfig.slotNumber}`);
+            
+            // Wait a bit between slots to let the page settle
+            await slotUpdater.page.waitForTimeout(1000);
+            
+          } catch (error) {
+            console.error(`❌ Failed to update Slot ${slotConfig.slotNumber}: ${error.message}`);
+            machineResults.failed.push({ slot: slotConfig.slotNumber, error: error.message });
+            console.log('Continuing with next slot...');
+            
+            // Wait a bit before trying next slot
+            await browserController.page.waitForTimeout(2000);
+          }
+        }
         
       } catch (error) {
-        console.error(`❌ Failed to update Slot ${config.slotNumber}: ${error.message}`);
-        results.failed.push({ slot: config.slotNumber, error: error.message });
-        console.log('Continuing with next slot...');
-        
-        // Wait a bit before trying next slot
-        await browserController.page.waitForTimeout(2000);
+        console.error(`Fatal error processing machine ${machineConfig.machineId}:`, error);
+        // Mark all remaining slots as failed
+        machineConfig.slots.forEach(slot => {
+          if (!machineResults.successful.includes(slot.slotNumber)) {
+            machineResults.failed.push({ slot: slot.slotNumber, error: 'Machine setup failed' });
+          }
+        });
+      }
+      
+      // Store results for this machine
+      overallResults.byMachine[machineConfig.machineId] = machineResults;
+      overallResults.totalSuccessful += machineResults.successful.length;
+      overallResults.totalFailed += machineResults.failed.length;
+      
+      // Machine summary
+      console.log(`\n--- Machine ${machineConfig.machineId} Summary ---`);
+      console.log(`✓ Successfully updated: ${machineResults.successful.length} slots`);
+      if (machineResults.successful.length > 0) {
+        console.log(`  Slots: ${machineResults.successful.join(', ')}`);
+      }
+      console.log(`❌ Failed: ${machineResults.failed.length} slots`);
+      if (machineResults.failed.length > 0) {
+        machineResults.failed.forEach(f => {
+          console.log(`  Slot ${f.slot}: ${f.error}`);
+        });
       }
     }
     
-    // Summary
-    console.log(`\n${'='.repeat(60)}`);
-    console.log('SUMMARY');
-    console.log('='.repeat(60));
-    console.log(`✓ Successfully updated: ${results.successful.length} slots`);
-    if (results.successful.length > 0) {
-      console.log(`  Slots: ${results.successful.join(', ')}`);
-    }
-    console.log(`❌ Failed: ${results.failed.length} slots`);
-    if (results.failed.length > 0) {
-      results.failed.forEach(f => {
-        console.log(`  Slot ${f.slot}: ${f.error}`);
-      });
+    // Overall summary
+    console.log(`\n${'='.repeat(70)}`);
+    console.log('OVERALL SUMMARY');
+    console.log('='.repeat(70));
+    console.log(`Total machines processed: ${machineConfigurations.length}`);
+    console.log(`✓ Total slots successfully updated: ${overallResults.totalSuccessful}`);
+    console.log(`❌ Total slots failed: ${overallResults.totalFailed}`);
+    
+    console.log('\nBy Machine:');
+    for (const [machineId, results] of Object.entries(overallResults.byMachine)) {
+      console.log(`  ${machineId}: ${results.successful.length} successful, ${results.failed.length} failed`);
     }
     
     // Close browser at the end
-    await browserController.closeBrowser();
+    if (browserController) {
+      await browserController.closeBrowser();
+    }
     
   } catch (error) {
-    console.error('Fatal error during setup:', error);
-    if (browserController.browser) {
+    console.error('Fatal error during execution:', error);
+    if (browserController && browserController.browser) {
       await browserController.browser.close();
     }
     throw error;
