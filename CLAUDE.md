@@ -147,6 +147,12 @@ Everything loads slowly. Always add waits:
 
 ## AI Assistant Rules
 
+### Quick Start Navigation
+- **Working on commodities?** → Check `/modules/commodity-management/`
+- **Working on slots?** → Check `/modules/slot-management/`
+- **Excel exports?** → Check `/excel-upload/`
+- **Looking for main navigation?** → Start with `/CLAUDE-INDEX.md`
+
 ### RULE #1: KEEP ANSWERS SHORT AND DIRECT
 - Answer in 1-3 sentences MAX unless deep analysis requested
 - Be concise but insightful
@@ -162,7 +168,7 @@ Everything loads slowly. Always add waits:
 - DO NOT create code or technical implementations
 - DISCUSSION means DISCUSSION, not building
 
-### RULE #11: HIERARCHICAL DOCUMENTATION
+### RULE #3: HIERARCHICAL DOCUMENTATION
 📁 EVERY directory must have CLAUDE.md and CLAUDE-INDEX.md files
 
 **Structure:**
