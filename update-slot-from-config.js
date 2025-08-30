@@ -91,29 +91,7 @@ class SlotUpdater {
     console.log('✓ Query executed');
     await this.slotFrame.waitForTimeout(3000);
     
-    // Debug: Check what's on the page
-    const pageInfo = await this.slotFrame.evaluate(() => {
-      const allButtons = Array.from(document.querySelectorAll('button, a'));
-      const editButtons = allButtons.filter(btn => btn.textContent?.trim() === 'Edit').length;
-      const anySlotText = document.body.textContent.includes('Slot number');
-      const firstFewSlots = [];
-      
-      // Look for slot text
-      const allText = Array.from(document.querySelectorAll('*')).filter(el => 
-        el.textContent?.includes('Slot number') && !el.children.length
-      );
-      
-      allText.slice(0, 5).forEach(el => {
-        firstFewSlots.push(el.textContent.trim());
-      });
-      
-      return { editButtons, anySlotText, firstFewSlots };
-    });
-    console.log(`Page loaded with ${pageInfo.editButtons} Edit buttons`);
-    console.log(`Contains "Slot number": ${pageInfo.anySlotText}`);
-    if (pageInfo.firstFewSlots.length > 0) {
-      console.log('First few slots found:', pageInfo.firstFewSlots);
-    }
+    // Wait for page to load without verbose debug output
   }
 
   async selectDropdownOption(dropdownIndex, optionText) {
@@ -313,9 +291,7 @@ class SlotUpdater {
         };
       });
       
-      console.log('After change verification:');
-      console.log(`  Button text: "${verifyResult.currentText}"`);
-      console.log(`  Button HTML: ${verifyResult.innerHTML.substring(0, 100)}...`);
+      // Product dropdown may not update visually due to Bootstrap Select behavior
       
     } else if (productChangeResult.success && !productChangeResult.changed) {
       console.log(`✓ Product already correct: "${productChangeResult.currentProduct}"`);
@@ -388,38 +364,7 @@ class SlotUpdater {
         }
       ];
 
-      // Find all inputs in modal for debugging
-      const allInputs = modal.querySelectorAll('input');
-      console.log(`Found ${allInputs.length} inputs in modal`);
-      
-      // Debug: log all input details
-      allInputs.forEach((input, idx) => {
-        const style = window.getComputedStyle(input);
-        const isVisible = style.display !== 'none' && style.visibility !== 'hidden';
-        console.log(`Input ${idx}: name="${input.name}", id="${input.id}", placeholder="${input.placeholder}", type="${input.type}", value="${input.value}", visible=${isVisible}`);
-      });
-
-      // Also look for inputs by traversing from labels
-      console.log('\n=== CHECKING LABELS AND THEIR INPUTS ===');
-      const allLabels = modal.querySelectorAll('label');
-      allLabels.forEach((label, idx) => {
-        const labelText = label.textContent?.trim() || '';
-        const forAttr = label.getAttribute('for');
-        let associatedInput = null;
-        
-        if (forAttr) {
-          associatedInput = modal.querySelector(`#${forAttr}`);
-        } else {
-          // Check next sibling or within parent
-          associatedInput = label.nextElementSibling || label.parentElement?.querySelector('input');
-        }
-        
-        if (associatedInput) {
-          console.log(`Label ${idx}: "${labelText}" -> Input: name="${associatedInput.name}", value="${associatedInput.value}"`);
-        } else {
-          console.log(`Label ${idx}: "${labelText}" -> No associated input found`);
-        }
-      });
+      // Removed verbose input debugging
 
       // Check and update each field
       for (const field of fieldMappings) {
@@ -551,7 +496,7 @@ class SlotUpdater {
     await this.takeScreenshot('before_close_button');
     
     const modalDebug = await this.debugModalState();
-    console.log('Modal debug info:', JSON.stringify(modalDebug, null, 2));
+    // console.log('Modal debug info:', JSON.stringify(modalDebug, null, 2));
     
     const closeClicked = await this.slotFrame.evaluate(() => {
       const modals = document.querySelectorAll('.modal, [class*="modal"], .popup, [class*="popup"], .alert, [class*="alert"]');
