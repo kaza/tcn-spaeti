@@ -89,26 +89,71 @@ This module handles slot management for vending machines - assigning products to
 ## Confirmed Working Flow
 
 1. Navigate to slot management
-2. Select "Default Unit2" from first dropdown
-3. Select "Slatko 2503050187" from second dropdown  
+2. Select machine grouping (e.g., "1050") from first dropdown
+3. Select machine ID (e.g., "Cips (5) 250306") from second dropdown  
 4. Click Query button
-5. Click Edit on any slot
-6. Modify fields in modal
-7. Click Submit
-8. Click Close on success confirmation
-9. Repeat for other slots
+5. Find slot by searching for "Slot numberX" text
+6. Click Edit button for the slot
+7. Change product using Bootstrap Select dropdown
+8. Update Machine Price (#SiPrice) and User-defined price (#SiCustomPrice)
+9. Click Submit
+10. Click Close on success confirmation ("Edited successfully")
+11. Repeat for other slots
+
+## Successfully Implemented Features
+
+### Slot Finding Algorithm
+- Searches for exact text "Slot numberX" in the page
+- Handles non-existent slots gracefully
+- Finds Edit button within the slot container
+
+### Product Selection
+- Uses Bootstrap Select dropdown (first dropdown in modal)
+- Clicks dropdown button, waits, then clicks product option
+- Note: Visual update may not reflect due to Bootstrap Select behavior
+
+### Price Fields (Confirmed Working)
+- **Machine Price**: `#SiPrice` 
+- **User-defined Price**: `#SiCustomPrice`
+- Both fields successfully update with new values
+
+### Batch Processing
+- Single login and navigation, then processes all slots
+- Handles missing slots (e.g., slots 2, 4) without stopping
+- Provides summary of successful and failed updates
+
+## Working Scripts
+
+### Main Implementation
+- `update-slot-from-config.js` - Complete slot update system with JSON configuration
+- `slot-configurations.json` - Configuration file with slot details
+
+### Configuration Format
+```json
+{
+  "slotNumber": 1,
+  "productName": "Red Bull Energy Drink",
+  "machinePrice": 3,
+  "userDefinedPrice": 3,
+  "capacity": 199,
+  "existing": 199,
+  "weChatDiscount": 100,
+  "alipayDiscount": 100,
+  "idCardDiscount": 100,
+  "alertingQuantity": ""
+}
+```
 
 ## Known Issues & Workarounds
 
 1. **Bootstrap Select**: Must use click simulation, not value setting
 2. **Modal Stacking**: Always close success confirmations before proceeding
-3. **Slow Loading**: Requires strategic waits after navigation and queries
-4. **Chinese/English Mix**: UI has mixed languages
-5. **Field Discovery**: Still mapping exact field selectors for price/product
+3. **Product Dropdown Display**: Shows machine grouping (e.g., "1050") instead of product name after selection
+4. **Multiple Modals**: Page has many hidden modals - must find the visible one
+5. **Slow Loading**: Reduced waits to 1-3 seconds for better performance
 
-## Next Steps
-1. Complete field mapping in edit modal ✓ (partially)
-2. Identify product dropdown in "top right" as mentioned by user
-3. Implement reliable product selection
-4. Test bulk updates with actual products
-5. Create production-ready scripts for ERP integration
+## Tested Configurations
+- Machine Grouping: 1050
+- Machine ID: Cips (5) 250306
+- Working slots: 1, 3, 5, 7, 9
+- Non-existent slots: 2, 4 (handled gracefully)

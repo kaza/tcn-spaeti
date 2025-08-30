@@ -25,6 +25,11 @@ Organized, tested, and production-ready modules.
   - `query-slot-management.js` - Query and navigate slot management
   - `bootstrap-select-handler.js` - Handle special dropdown interactions
   - `CLAUDE.md` - Slot management documentation
+  
+### 📁 Root Level Scripts - Production Ready
+- **`update-slot-from-config.js`** - Automated slot updates from JSON configuration
+- **`slot-configurations.json`** - Slot configuration file (products, prices)
+- **[SLOT-UPDATE-README.md](SLOT-UPDATE-README.md)** - Complete documentation for slot updates
 
 ### 📁 /excel-upload/ - Excel Import/Export
 Utilities for generating Excel files from SQL Server data for Ourvend import.
