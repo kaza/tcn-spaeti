@@ -89,8 +89,7 @@ class SlotUpdater {
     });
     
     console.log('✓ Query executed');
-    console.log('Waiting for slots to load...');
-    await this.slotFrame.waitForTimeout(8000);
+    await this.slotFrame.waitForTimeout(3000);
     
     // Debug: Check what's on the page
     const pageInfo = await this.slotFrame.evaluate(() => {
@@ -223,7 +222,7 @@ class SlotUpdater {
     }
     
     console.log(`✓ Opened Slot ${slotNumber} for editing`);
-    await this.slotFrame.waitForTimeout(3000);
+    await this.slotFrame.waitForTimeout(2000);
   }
 
   async changeProductIfNeeded(expectedProductName) {
@@ -295,8 +294,8 @@ class SlotUpdater {
     
     if (productChangeResult.changed) {
       console.log(`✓ Changed product from "${productChangeResult.oldProduct}" to "${productChangeResult.newProduct}"`);
-      // Wait longer for dropdown to update
-      await this.slotFrame.waitForTimeout(3000);
+      // Wait for dropdown to update
+      await this.slotFrame.waitForTimeout(1000);
       
       // Verify the product actually changed
       const verifyResult = await this.slotFrame.evaluate(() => {
@@ -527,7 +526,7 @@ class SlotUpdater {
   }
 
   async checkForSuccessMessage() {
-    await this.slotFrame.waitForTimeout(3000);
+    await this.slotFrame.waitForTimeout(2000);
     
     const result = await this.slotFrame.evaluate(() => {
       const alerts = document.querySelectorAll('.alert-success, [class*="success"]');
@@ -546,7 +545,7 @@ class SlotUpdater {
   }
 
   async closeSuccessModal() {
-    await this.slotFrame.waitForTimeout(3000);
+    await this.slotFrame.waitForTimeout(2000);
     console.log('Looking for success message box...');
     
     await this.takeScreenshot('before_close_button');
@@ -735,7 +734,7 @@ async function main() {
         console.log(`✓ Successfully updated Slot ${config.slotNumber}`);
         
         // Wait a bit between slots to let the page settle
-        await slotUpdater.page.waitForTimeout(2000);
+        await slotUpdater.page.waitForTimeout(1000);
         
       } catch (error) {
         console.error(`❌ Failed to update Slot ${config.slotNumber}: ${error.message}`);
