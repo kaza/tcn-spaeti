@@ -1,0 +1,14 @@
+[
+  {
+    "slotNumber": 1,
+    "productName": "Red Bull Energy Drink",
+    "machinePrice": 2.6,
+    "userDefinedPrice": 2.6,
+    "capacity": 199,
+    "existing": 199,
+    "weChatDiscount": 100,
+    "alipayDiscount": 100,
+    "idCardDiscount": 100,
+    "alertingQuantity": ""
+  }
+]
