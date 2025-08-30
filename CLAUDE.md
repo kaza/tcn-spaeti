@@ -144,3 +144,66 @@ Everything loads slowly. Always add waits:
 - The platform uses Chinese and English interfaces
 - Some operations may require handling of dynamic content and AJAX requests
 - Always preserve the existing authentication mechanism when modifying scripts
+
+## AI Assistant Rules
+
+### RULE #1: KEEP ANSWERS SHORT AND DIRECT
+- Answer in 1-3 sentences MAX unless deep analysis requested
+- Be concise but insightful
+- Let user ask for more details if needed
+
+### RULE #2: STRATEGIC THINKING MODE
+- When user says "let's discuss" or "brainstorm" - engage in strategic dialogue
+- Challenge assumptions constructively
+- Provide multiple perspectives (investor, customer, competitor view)
+- Use frameworks when helpful (SWOT, Porter's Five Forces, Jobs-to-be-Done)
+- Back opinions with market data or examples when possible
+- If user asks a question or wants to brainstorm - ANSWER IT and PROVIDE SUGGESTIONS
+- DO NOT create code or technical implementations
+- DISCUSSION means DISCUSSION, not building
+
+### RULE #11: HIERARCHICAL DOCUMENTATION
+📁 EVERY directory must have CLAUDE.md and CLAUDE-INDEX.md files
+
+**Structure:**
+- `CLAUDE.md` - Directory-specific instructions, rules, and context
+- `CLAUDE-INDEX.md` - Navigation index for that directory's contents
+
+**Example hierarchy:**
+```
+/strategy/
+  ├── CLAUDE.md           # Strategy-specific rules
+  ├── CLAUDE-INDEX.md     # Index of strategy docs
+  ├── decisions/
+  │   ├── CLAUDE.md       # Decision documentation rules
+  │   ├── CLAUDE-INDEX.md # Index of decisions
+  │   └── *.md            # Individual decision docs
+```
+
+**Requirements:**
+- Root files - Overall repo rules and top-level navigation
+- Directory files - Context and navigation for that specific area
+- Inheritance - Subdirectory rules add to (not replace) parent rules
+- Updates - When adding files, update the directory's CLAUDE-INDEX.md
+- Consistency - Use same format across all CLAUDE files
+
+### Documentation Navigation - HIERARCHICAL SYSTEM
+🔍 HIERARCHICAL CLAUDE FILES - CHECK AT EVERY LEVEL!
+
+**Navigation hierarchy:**
+- Start with root `/CLAUDE-INDEX.md` - Top-level navigation
+- Check directory `CLAUDE.md` - Understand that area's rules
+- Use directory `CLAUDE-INDEX.md` - Navigate within that area
+- Each directory is self-contained - Has its own documentation
+
+**What each file contains:**
+- Root `/CLAUDE.md` - Overall repository rules and strategy
+- Root `/CLAUDE-INDEX.md` - Navigation to all major areas
+- Directory `CLAUDE.md` - Specific instructions for that domain
+- Directory `CLAUDE-INDEX.md` - Index of files in that directory
+
+**CLAUDE-INDEX.md Purpose:**
+- Contains short description of each file's content
+- Provides direct links to files
+- Should be used BEFORE searching files
+- Enables quick navigation without file searching
