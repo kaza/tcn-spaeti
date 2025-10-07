@@ -4,3 +4,10 @@ screenshots/
 cookies.json
 .env
 .DS_Store
+
+# Generated outputs (keep directories but ignore files)
+excel-imports/*.xls
+excel-imports/*.xlsx
+csv-validations/*.csv
+!csv-validations/.gitkeep
+!excel-imports/.gitkeep
