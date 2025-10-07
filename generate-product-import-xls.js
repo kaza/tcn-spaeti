@@ -1,6 +1,6 @@
 const path = require('path');
 const fs = require('fs');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+require('dotenv').config();
 const sql = require('mssql');
 const XLSX = require('xlsx');
 
