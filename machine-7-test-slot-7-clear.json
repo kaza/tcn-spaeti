@@ -1,0 +1,21 @@
+{
+  "machineId": 7,
+  "machineGrouping": "1050",
+  "machineName": "Cips (5) 2503060046",
+  "remoteId": 3060046,
+  "serial": "2503060046",
+  "slots": [
+    {
+      "slotNumber": 7,
+      "productName": "",
+      "machinePrice": 0,
+      "userDefinedPrice": 0,
+      "capacity": 0,
+      "existing": 0,
+      "weChatDiscount": 100,
+      "alipayDiscount": 100,
+      "idCardDiscount": 100,
+      "alertingQuantity": ""
+    }
+  ]
+}

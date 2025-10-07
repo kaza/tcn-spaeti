@@ -334,27 +334,402 @@ class SlotUpdater {
   }
 
   /**
+   * Finds the Clear LINK for a specific slot by searching for onclick attribute
+   *
+   * IMPORTANT: The Clear element is a LINK (<a> tag), NOT a button!
+   * Example HTML: <a href="#" class="btn btn-danger" role="button" onclick="Clear('7','2503060046','')">Clear</a>
+   *
+   * The onclick pattern is: Clear('SLOT_NUMBER','SERIAL_NUMBER','')
+   * We search for the beginning of the pattern: Clear('7',
+   *
+   * @param {number} slotNumber - The slot number to find
+   * @returns {Promise<{found: boolean, onclick?: string, element?: string}>}
+   */
+  async findSlotClearLinkByOnclick(slotNumber) {
+    console.log(`\n  🔍 Searching for Clear LINK with pattern: Clear('${slotNumber}',`);
+
+    const result = await this.slotFrame.evaluate((slotNum) => {
+      const searchPattern = `Clear('${slotNum}',`;
+
+      // Search for <a> tags (Clear is a LINK, not a button!)
+      const allLinks = document.querySelectorAll('a');
+
+      const allClearLinks = [];
+      const allOnclicksWithClear = [];
+
+      for (const link of allLinks) {
+        const onclick = link.getAttribute('onclick');
+        const linkText = link.textContent?.trim();
+
+        if (onclick) {
+          // Collect all Clear-related onclick patterns for debugging
+          if (onclick.toLowerCase().includes('clear')) {
+            allOnclicksWithClear.push(onclick);
+          }
+
+          // Check if this is the Clear link for our slot
+          if (onclick.includes(searchPattern)) {
+            return {
+              found: true,
+              onclick: onclick,
+              element: `<a href="${link.href}" class="${link.className}" onclick="${onclick}">${linkText}</a>`
+            };
+          }
+        }
+
+        // Collect all Clear links for debugging
+        if (linkText?.toLowerCase().includes('clear') || linkText === '清除') {
+          allClearLinks.push({
+            text: linkText,
+            onclick: onclick || 'no onclick',
+            className: link.className,
+            href: link.href
+          });
+        }
+      }
+
+      return {
+        found: false,
+        searchPattern: searchPattern,
+        allClearLinks: allClearLinks.slice(0, 10),
+        allOnclicksWithClear: allOnclicksWithClear.slice(0, 10)
+      };
+    }, slotNumber);
+
+    if (result.found) {
+      console.log(`  ✓ Found Clear link: ${result.element}`);
+    } else {
+      console.log(`  ❌ Clear link NOT found!`);
+    }
+
+    return result;
+  }
+
+  /**
+   * Clicks the Clear LINK for a specific slot
+   *
+   * IMPORTANT: This clicks a LINK (<a> tag), NOT a button!
+   * Example: <a href="#" onclick="Clear('7','2503060046','')">Clear</a>
+   *
+   * NOTE: Clicking this link triggers a NATIVE JavaScript confirm() dialog
+   *
+   * @param {number} slotNumber - The slot number to clear
+   */
+  async clickSlotClearLink(slotNumber) {
+    console.log(`  🖱️  Clicking Clear link for slot ${slotNumber}...`);
+
+    await this.slotFrame.evaluate((slotNum) => {
+      const searchPattern = `Clear('${slotNum}',`;
+
+      // Search for <a> tags (Clear is a LINK!)
+      const allLinks = document.querySelectorAll('a');
+
+      for (const link of allLinks) {
+        const onclick = link.getAttribute('onclick');
+        if (onclick && onclick.includes(searchPattern)) {
+          link.click();
+          return;
+        }
+      }
+    }, slotNumber);
+
+    // Small wait for the native confirm() dialog to appear
+    await this.slotFrame.waitForTimeout(500);
+  }
+
+  /**
+   * Handles the NATIVE JavaScript confirm() dialog that appears when clearing a slot
+   *
+   * IMPORTANT: This is a NATIVE browser confirm() dialog, NOT an HTML modal!
+   * It cannot be found in the DOM - we must use Playwright's dialog event handler.
+   *
+   * MANDATORY: This dialog MUST appear with the expected text
+   * Expected dialog text: "Are you really sure you want to empty? Please confirm"
+   * Expected type: confirm (with OK/Cancel buttons)
+   *
+   * @returns {Promise<{found: boolean, message?: string}>}
+   * @throws {Error} If confirmation dialog not found or doesn't have expected text
+   */
+  async confirmClearDialog() {
+    console.log(`\n  ⏳ Waiting for NATIVE JavaScript confirm() dialog...`);
+
+    return new Promise((resolve, reject) => {
+      let dialogHandled = false;
+      const timeout = setTimeout(() => {
+        if (!dialogHandled) {
+          reject(new Error('VALIDATION FAILED: Native confirm() dialog did not appear within 5 seconds'));
+        }
+      }, 5000);
+
+      // Set up dialog handler for native JavaScript confirm()
+      const dialogHandler = async (dialog) => {
+        dialogHandled = true;
+        clearTimeout(timeout);
+
+        const dialogType = dialog.type();
+        const dialogMessage = dialog.message();
+
+        console.log(`  📋 Native dialog detected!`);
+        console.log(`    Type: ${dialogType}`);
+        console.log(`    Message: "${dialogMessage}"`);
+
+        // MANDATORY VALIDATION: Dialog MUST be a confirm dialog
+        if (dialogType !== 'confirm') {
+          this.page.off('dialog', dialogHandler);
+          reject(new Error(`VALIDATION FAILED: Expected confirm dialog, got ${dialogType}`));
+          return;
+        }
+
+        // MANDATORY VALIDATION: Dialog MUST have expected text
+        const messageLower = dialogMessage.toLowerCase();
+        const hasExpectedText = messageLower.includes('empty') ||
+                               messageLower.includes('sure') ||
+                               messageLower.includes('confirm');
+
+        if (!hasExpectedText) {
+          this.page.off('dialog', dialogHandler);
+          reject(new Error(`VALIDATION FAILED: Dialog message "${dialogMessage}" does not contain expected text`));
+          return;
+        }
+
+        console.log(`  ✓ CONFIRMATION DIALOG VALIDATED`);
+        console.log(`    Accepting dialog (clicking OK)...`);
+
+        // Accept the dialog (click OK)
+        await dialog.accept();
+
+        console.log(`  ✓ Dialog accepted`);
+
+        // Remove the handler after use
+        this.page.off('dialog', dialogHandler);
+
+        resolve({ found: true, message: dialogMessage });
+      };
+
+      // Register the dialog handler
+      this.page.on('dialog', dialogHandler);
+    });
+  }
+
+  /**
+   * Waits for and closes the "Clear success" message box
+   *
+   * MANDATORY: This success message MUST appear
+   * Expected message: "Clearsuccess" or "Clear success"
+   * Expected button: "Close" or "OK"
+   *
+   * @throws {Error} If success message not found
+   */
+  async closeClearSuccessMessageBox() {
+    console.log(`\n  ⏳ Waiting for success message...`);
+    await this.slotFrame.waitForTimeout(2000);
+
+    // Take screenshot to see what's on screen
+    await this.page.screenshot({
+      path: `screenshots/clear_success_search_${getTimestamp()}.png`,
+      fullPage: true
+    });
+
+    const result = await this.slotFrame.evaluate(() => {
+      const modals = document.querySelectorAll('.modal, [class*="modal"]');
+      const debugInfo = {
+        visibleModals: 0,
+        modalTexts: [],
+        allButtons: [],
+        checkedModals: []
+      };
+
+      for (const modal of modals) {
+        const style = window.getComputedStyle(modal);
+        if (style.display !== 'none' && style.visibility !== 'hidden') {
+          debugInfo.visibleModals++;
+          const text = (modal.textContent || '').trim();
+          const textLower = text.toLowerCase().replace(/\s+/g, ''); // Remove all whitespace
+
+          // Store short version for debugging
+          const shortText = text.substring(0, 150).replace(/\s+/g, ' ');
+          if (shortText.length > 0) {
+            debugInfo.modalTexts.push(shortText);
+          }
+
+          const buttons = modal.querySelectorAll('button');
+          for (const button of buttons) {
+            const btnText = button.textContent?.trim();
+            if (btnText) {
+              debugInfo.allButtons.push(btnText);
+            }
+          }
+
+          // Look for "Clearsuccess" (one word) or "Clear success" or variations
+          const hasSuccessMessage = textLower.includes('clearsuccess') ||
+                                   (textLower.includes('clear') && textLower.includes('success')) ||
+                                   textLower.includes('successfully') ||
+                                   textLower.includes('成功'); // Chinese for success
+
+          debugInfo.checkedModals.push({
+            text: shortText,
+            hasSuccess: hasSuccessMessage,
+            textLower: textLower.substring(0, 100)
+          });
+
+          if (hasSuccessMessage) {
+            for (const button of buttons) {
+              const btnText = button.textContent?.trim().toLowerCase();
+              if (btnText === 'close' || btnText === 'ok' ||
+                  btnText === '关闭' || btnText === 'submit') {
+                button.click();
+                return {
+                  found: true,
+                  message: shortText,
+                  buttonClicked: btnText
+                };
+              }
+            }
+          }
+        }
+      }
+      return { found: false, debugInfo };
+    });
+
+    // MANDATORY VALIDATION: Success message MUST be found
+    if (!result.found) {
+      console.log(`\n❌ VALIDATION FAILED: Success message "Clearsuccess" NOT FOUND`);
+      if (result.debugInfo) {
+        console.log(`  Debug: ${result.debugInfo.visibleModals} visible modals`);
+        if (result.debugInfo.checkedModals.length > 0) {
+          console.log(`\n  Checked modals for success message:`);
+          result.debugInfo.checkedModals.forEach((m, i) => {
+            console.log(`    ${i + 1}. hasSuccess=${m.hasSuccess}, text="${m.text}"`);
+            console.log(`       textLower="${m.textLower}"`);
+          });
+        }
+        if (result.debugInfo.allButtons.length > 0) {
+          console.log(`  Buttons in visible modals: ${result.debugInfo.allButtons.join(', ')}`);
+        }
+      }
+      console.log(`\n  Screenshot saved to: screenshots/clear_success_search_${getTimestamp()}.png`);
+      throw new Error('VALIDATION FAILED: Success message "Clearsuccess" not found');
+    }
+
+    console.log(`  ✓ SUCCESS MESSAGE VALIDATED`);
+    console.log(`    Button clicked: "${result.buttonClicked}"`);
+    console.log(`    Message text: "${result.message}"`);
+
+    await this.slotFrame.waitForTimeout(1000);
+  }
+
+  /**
+   * Clears a slot by clicking the Clear LINK
+   *
+   * IMPORTANT: Clear is implemented as a LINK (<a> tag), NOT a button!
+   * Example HTML: <a href="#" class="btn btn-danger" role="button" onclick="Clear('7','2503060046','')">Clear</a>
+   *
+   * Process:
+   * 1. Find and click the Clear link
+   * 2. Confirm the clear action in the dialog
+   * 3. Close the success message
+   *
+   * @param {number} slotNumber - The slot number to clear
+   * @throws {Error} If Clear link cannot be found
+   */
+  async clearSlot(slotNumber) {
+    console.log(`\n=== CLEARING SLOT ${slotNumber} ===`);
+    console.log(`NOTE: Clear is a LINK (<a> tag), not a button!`);
+
+    const maxFindAttempts = 3;
+    let linkSearch = null;
+
+    // Try to find the Clear LINK with retries
+    for (let findAttempt = 1; findAttempt <= maxFindAttempts; findAttempt++) {
+      if (findAttempt > 1) {
+        console.log(`  Retry ${findAttempt}/${maxFindAttempts}: Searching for Clear link...`);
+        await this.slotFrame.waitForTimeout(3000);
+      }
+
+      linkSearch = await this.findSlotClearLinkByOnclick(slotNumber);
+
+      if (linkSearch.found) {
+        console.log(`✓ FOUND Clear link: ${linkSearch.onclick}`);
+        break;
+      }
+
+      console.log(`  Clear link not found, waiting...`);
+    }
+
+    // VALIDATION: Ensure the Clear link was found
+    if (!linkSearch || !linkSearch.found) {
+      console.log(`\n❌ VALIDATION FAILED: Could not find Clear link for slot ${slotNumber}`);
+      console.log(`  Searched for onclick pattern: ${linkSearch?.searchPattern}`);
+
+      if (linkSearch?.allClearLinks && linkSearch.allClearLinks.length > 0) {
+        console.log(`\n  Clear links found on page:`);
+        linkSearch.allClearLinks.forEach((link, i) => {
+          console.log(`    ${i + 1}. text="${link.text}", onclick="${link.onclick}", class="${link.className}"`);
+        });
+      } else {
+        console.log(`  ⚠️  No Clear links found on page`);
+      }
+
+      if (linkSearch?.allOnclicksWithClear && linkSearch.allOnclicksWithClear.length > 0) {
+        console.log(`\n  All onclick attributes containing 'clear':`);
+        linkSearch.allOnclicksWithClear.forEach((onclick, i) => {
+          console.log(`    ${i + 1}. ${onclick}`);
+        });
+      }
+
+      throw new Error(`VALIDATION FAILED: Clear link not found for slot ${slotNumber}`);
+    }
+
+    console.log(`✓ VALIDATION PASSED: Clear link exists and will be clicked`);
+
+    // Step 1: Set up dialog handler BEFORE clicking (native dialogs happen immediately)
+    const confirmPromise = this.confirmClearDialog();
+
+    // Step 2: Click the Clear LINK (this triggers the native confirm() dialog)
+    await this.clickSlotClearLink(slotNumber);
+    console.log('✓ Clicked Clear link');
+
+    // Step 3: Wait for and handle the native confirmation dialog
+    const confirmResult = await confirmPromise;
+    console.log(`✓ Confirmation dialog handled: "${confirmResult.message}"`);
+
+    // Step 4: Wait for and close "Clear success" message box
+    await this.closeClearSuccessMessageBox();
+
+    console.log(`✓ Successfully cleared Slot ${slotNumber}`);
+  }
+
+  /**
    * Orchestrates the complete update process for a single slot
    * @param {Object} slotConfig - The slot configuration object
    * @returns {Promise<{success: boolean, slot: number, error?: string}>}
    */
   async updateSlot(slotConfig) {
     console.log(`\n${'='.repeat(60)}`);
-    console.log(`Processing Slot ${slotConfig.slotNumber}: ${slotConfig.productName}`);
+    console.log(`Processing Slot ${slotConfig.slotNumber}: ${slotConfig.productName || '(CLEAR SLOT)'}`);
     console.log('='.repeat(60));
 
     try {
+      // Check if we need to clear the slot (empty product name)
+      if (!slotConfig.productName || slotConfig.productName.trim() === '') {
+        await this.clearSlot(slotConfig.slotNumber);
+        console.log(`✓ Successfully cleared Slot ${slotConfig.slotNumber}`);
+        return { success: true, slot: slotConfig.slotNumber };
+      }
+
       // Step 1: Open the slot edit modal
       await this.openSlotForEditing(slotConfig.slotNumber);
 
       // Step 2: Update product if needed
-      await this.updateSlotProduct(slotConfig.productName);
+      const productChanged = await this.updateSlotProduct(slotConfig.productName);
 
       // Step 3: Update prices
       const pricesChanged = await this.updateSlotPrices(slotConfig);
 
       // Step 4: Save or close modal
-      if (pricesChanged) {
+      const anyChanges = productChanged || pricesChanged;
+
+      if (anyChanges) {
         await this.submitModal();
         await this.closeSuccessModal();
       } else {
@@ -426,6 +801,7 @@ class SlotUpdater {
   /**
    * Updates the slot's product if it doesn't match the expected product
    * @param {string} expectedProductName - The product name that should be selected
+   * @returns {Promise<boolean>} True if product was changed, false if already correct
    * @throws {Error} If product cannot be found or selected
    */
   async updateSlotProduct(expectedProductName) {
@@ -439,7 +815,7 @@ class SlotUpdater {
 
     if (currentProduct.includes(expectedProductName)) {
       console.log(`✓ Product already correct`);
-      return;
+      return false;
     }
 
     console.log(`  Current: "${currentProduct}"`);
@@ -453,6 +829,7 @@ class SlotUpdater {
 
     console.log(`✓ Changed product to "${expectedProductName}"`);
     await this.slotFrame.waitForTimeout(1000);
+    return true;
   }
 
   /**
