@@ -166,7 +166,7 @@ const args = process.argv.slice(2);
 
 if (args.length < 2) {
   console.error('Usage: node compare-config-with-csv.js <config.json> <export.csv>');
-  console.error('Example: node compare-config-with-csv.js machine-7-config.json "csv/Slot information(2025_10_7).csv"');
+  console.error('Example: node compare-config-with-csv.js machine-configs/machine-7-config.json "csv-validations/Slot information(2025_10_7).csv"');
   process.exit(1);
 }
 

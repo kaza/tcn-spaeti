@@ -1068,7 +1068,7 @@ async function main() {
 
   if (!configFile) {
     console.error('Usage: node sync-machine-to-cloud.js <config-file>');
-    console.error('Example: node sync-machine-to-cloud.js machine-7-config.json');
+    console.error('Example: node sync-machine-to-cloud.js machine-configs/machine-7-config.json');
     process.exit(1);
   }
 

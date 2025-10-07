@@ -8,21 +8,31 @@ This project provides browser automation scripts using Playwright to create an A
 - **Secondary Goal**: Collect sales data from Ourvend for import into the ERP system
 - **Method**: Use Playwright to interact with the Ourvend web interface as if it were an API
 
-## Quick Start - Sync Machine to Cloud
+## Quick Start - Complete Workflow
 
-**Database → Cloud Sync (2-step process):**
+**3-Step Process (Product Import → Slot Sync → Validation):**
 
 ```bash
-# Step 1: Generate config from database
-node generate-machine-config.js 7
+# Step 1: Generate Excel for product import (if needed)
+node generate-product-import-xls.js
+# Output: excel-imports/product-import-YYYYMMDD_HHMM.xls
+# Manually upload to Ourvend
 
-# Step 2: Sync to Ourvend cloud
-node sync-machine-to-cloud.js machine-7-config.json
+# Step 2a: Generate machine config from database
+node generate-machine-config.js 7
+# Output: machine-configs/machine-7-config.json
+
+# Step 2b: Sync to Ourvend cloud
+node sync-machine-to-cloud.js machine-configs/machine-7-config.json
+
+# Step 3: Validate sync (after exporting CSV from Ourvend)
+node compare-config-with-csv.js
 ```
 
 **Documentation:**
-- **[SYNC-WORKFLOW.md](SYNC-WORKFLOW.md)** - Complete sync workflow guide
-- **[DATABASE-SCHEMA.md](DATABASE-SCHEMA.md)** - Database schema documentation
+- **[TOOLS.md](TOOLS.md)** - Complete tools usage guide (START HERE)
+- **[docs/SYNC-WORKFLOW.md](docs/SYNC-WORKFLOW.md)** - Detailed sync workflow
+- **[docs/DATABASE-SCHEMA.md](docs/DATABASE-SCHEMA.md)** - Database schema
 
 ## Key Components
 
@@ -164,10 +174,34 @@ Everything loads slowly. Always add waits:
 ## AI Assistant Rules
 
 ### Quick Start Navigation
+- **Need to use tools?** → Start with `TOOLS.md` (4 essential tools)
 - **Working on commodities?** → Check `/modules/commodity-management/`
 - **Working on slots?** → Check `/modules/slot-management/`
-- **Excel exports?** → Check `/excel-upload/`
-- **Looking for main navigation?** → Start with `/CLAUDE-INDEX.md`
+- **Looking for documentation?** → Check `/docs/`
+- **Looking for old code?** → Check `/archive/`
+
+### Repository Structure (Post-Cleanup)
+```
+/
+├── generate-product-import-xls.js     ← Tool 1: Product import
+├── generate-machine-config.js         ← Tool 2a: Config generation
+├── sync-machine-to-cloud.js           ← Tool 2b: Cloud sync
+├── compare-config-with-csv.js         ← Tool 3: Validation
+│
+├── machine-configs/                   ← Production configs
+├── test-configs/                      ← Test configs
+├── csv-validations/                   ← CSV validation files
+├── excel-imports/                     ← Generated Excel files
+│
+├── docs/                              ← All documentation
+├── modules/                           ← Modular Playwright code
+├── screenshots/                       ← Browser automation screenshots
+├── archive/                           ← Deprecated/old files
+│
+├── TOOLS.md                           ← Main tools guide
+├── CLAUDE.md                          ← This file
+└── README.md                          ← Project readme
+```
 
 ### RULE #1: KEEP ANSWERS SHORT AND DIRECT
 - Answer in 1-3 sentences MAX unless deep analysis requested

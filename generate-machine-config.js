@@ -101,10 +101,10 @@ async function generateMachineConfig(machineId) {
     };
 
     // Save to individual machine config file
-    const configPath = path.join(__dirname, `machine-${machineId}-config.json`);
+    const configPath = path.join(__dirname, 'machine-configs', `machine-${machineId}-config.json`);
     fs.writeFileSync(configPath, JSON.stringify(machineConfig, null, 2));
 
-    console.log(`✓ Configuration saved to: machine-${machineId}-config.json`);
+    console.log(`✓ Configuration saved to: machine-configs/machine-${machineId}-config.json`);
     console.log(`\n=== SUMMARY ===`);
     console.log(`  Machine ID: ${machineId}`);
     console.log(`  Machine Name: ${machineConfig.machineName}`);
@@ -119,7 +119,7 @@ async function generateMachineConfig(machineId) {
     }
 
     console.log(`\n✓ Ready to sync! Run:`);
-    console.log(`  node sync-machine-to-cloud.js machine-${machineId}-config.json\n`);
+    console.log(`  node sync-machine-to-cloud.js machine-configs/machine-${machineId}-config.json\n`);
 
   } catch (err) {
     console.error('Error:', err);

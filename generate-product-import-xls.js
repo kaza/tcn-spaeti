@@ -164,11 +164,11 @@ async function generateProductImportXLS() {
     ws['!cols'] = colWidths;
 
     // Save the file
-    const outputPath = path.join(__dirname, getOutputFilename());
-    
+    const outputPath = path.join(__dirname, 'excel-imports', getOutputFilename());
+
     // Write as XLS (BIFF8 format)
     XLSX.writeFile(wb, outputPath, { bookType: 'xls' });
-    
+
     console.log(`✓ XLS file saved: ${outputPath}`);
     console.log(`✓ Total products exported: ${result.recordset.length}`);
 
