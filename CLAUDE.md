@@ -8,6 +8,22 @@ This project provides browser automation scripts using Playwright to create an A
 - **Secondary Goal**: Collect sales data from Ourvend for import into the ERP system
 - **Method**: Use Playwright to interact with the Ourvend web interface as if it were an API
 
+## Quick Start - Sync Machine to Cloud
+
+**Database → Cloud Sync (2-step process):**
+
+```bash
+# Step 1: Generate config from database
+node generate-machine-config.js 7
+
+# Step 2: Sync to Ourvend cloud
+node sync-machine-to-cloud.js machine-7-config.json
+```
+
+**Documentation:**
+- **[SYNC-WORKFLOW.md](SYNC-WORKFLOW.md)** - Complete sync workflow guide
+- **[DATABASE-SCHEMA.md](DATABASE-SCHEMA.md)** - Database schema documentation
+
 ## Key Components
 
 ### 1. Authentication
