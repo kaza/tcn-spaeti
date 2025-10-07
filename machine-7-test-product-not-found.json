@@ -1,0 +1,45 @@
+{
+  "machineId": 7,
+  "machineGrouping": "1050",
+  "machineName": "Cips (5) 2503060046",
+  "remoteId": 3060046,
+  "serial": "2503060046",
+  "slots": [
+    {
+      "slotNumber": 1,
+      "productName": "Nic Nacs Double Crunch Peanuts",
+      "machinePrice": 3.8,
+      "userDefinedPrice": 3.8,
+      "capacity": 199,
+      "existing": 199,
+      "weChatDiscount": 100,
+      "alipayDiscount": 100,
+      "idCardDiscount": 100,
+      "alertingQuantity": ""
+    },
+    {
+      "slotNumber": 3,
+      "productName": "THIS PRODUCT DOES NOT EXIST IN DROPDOWN",
+      "machinePrice": 9.99,
+      "userDefinedPrice": 9.99,
+      "capacity": 199,
+      "existing": 199,
+      "weChatDiscount": 100,
+      "alipayDiscount": 100,
+      "idCardDiscount": 100,
+      "alertingQuantity": ""
+    },
+    {
+      "slotNumber": 5,
+      "productName": "Soletti Gold Fischli Seasam",
+      "machinePrice": 3,
+      "userDefinedPrice": 3,
+      "capacity": 199,
+      "existing": 199,
+      "weChatDiscount": 100,
+      "alipayDiscount": 100,
+      "idCardDiscount": 100,
+      "alertingQuantity": ""
+    }
+  ]
+}

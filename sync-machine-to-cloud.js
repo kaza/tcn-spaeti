@@ -702,7 +702,7 @@ class SlotUpdater {
   /**
    * Orchestrates the complete update process for a single slot
    * @param {Object} slotConfig - The slot configuration object
-   * @returns {Promise<{success: boolean, slot: number, error?: string}>}
+   * @returns {Promise<{success: boolean, slot: number, productName?: string, error?: string, productNotFound?: boolean}>}
    */
   async updateSlot(slotConfig) {
     console.log(`\n${'='.repeat(60)}`);
@@ -741,7 +741,17 @@ class SlotUpdater {
 
     } catch (error) {
       console.error(`❌ Failed to update Slot ${slotConfig.slotNumber}: ${error.message}`);
-      return { success: false, slot: slotConfig.slotNumber, error: error.message };
+
+      // Check if error is due to product not found
+      const isProductNotFound = error.message.includes('Could not find product');
+
+      return {
+        success: false,
+        slot: slotConfig.slotNumber,
+        productName: slotConfig.productName,
+        error: error.message,
+        productNotFound: isProductNotFound
+      };
     }
   }
 
@@ -1067,6 +1077,9 @@ async function main() {
     process.exit(1);
   }
 
+  // Start timer
+  const startTime = Date.now();
+
   console.log(`\n${'='.repeat(70)}`);
   console.log('MACHINE SYNC TO OURVEND CLOUD');
   console.log('='.repeat(70));
@@ -1093,7 +1106,8 @@ async function main() {
 
     const results = {
       successful: [],
-      failed: []
+      failed: [],
+      productsNotFound: []  // Track products not found in dropdown
     };
 
     for (const slotConfig of machineConfig.slots) {
@@ -1103,15 +1117,31 @@ async function main() {
         results.successful.push(result.slot);
       } else {
         results.failed.push(result);
+
+        // Track products not found separately
+        if (result.productNotFound) {
+          results.productsNotFound.push({
+            slot: result.slot,
+            productName: result.productName
+          });
+        }
       }
 
       await updater.page.waitForTimeout(1000);
     }
 
+    // Calculate duration
+    const endTime = Date.now();
+    const durationMs = endTime - startTime;
+    const durationSec = Math.floor(durationMs / 1000);
+    const minutes = Math.floor(durationSec / 60);
+    const seconds = durationSec % 60;
+
     console.log(`\n${'='.repeat(70)}`);
     console.log('SYNC SUMMARY');
     console.log('='.repeat(70));
     console.log(`Machine: ${machineConfig.machineName}`);
+    console.log(`Duration: ${minutes}m ${seconds}s (${durationSec} seconds)`);
     console.log(`✓ Successfully synced: ${results.successful.length} slots`);
     if (results.successful.length > 0) {
       console.log(`  Slots: ${results.successful.join(', ')}`);
@@ -1122,6 +1152,16 @@ async function main() {
         console.log(`  Slot ${f.slot}: ${f.error}`);
       });
     }
+
+    // Display products not found
+    if (results.productsNotFound.length > 0) {
+      console.log(`\n⚠️  PRODUCTS NOT FOUND IN DROPDOWN (${results.productsNotFound.length} total):`);
+      console.log('='.repeat(70));
+      results.productsNotFound.forEach(item => {
+        console.log(`  Slot ${item.slot}: "${item.productName}"`);
+      });
+    }
+
     console.log('='.repeat(70));
 
     await updater.closeBrowser();
