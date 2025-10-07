@@ -51,8 +51,8 @@ async function generateMachineConfig(machineId) {
     console.log(`  Remote ID: ${machine.remote_id}`);
     console.log(`  Serial: ${machine.serial}\n`);
 
-    // Get all slots with product details
-    console.log('Fetching slot configurations...');
+    // Get all slots (including empty ones) with product details
+    console.log('Fetching slot configurations (including empty slots)...');
     const slotsResult = await pool.request()
       .input('machineId', sql.Int, machineId)
       .query(`
@@ -65,24 +65,25 @@ async function generateMachineConfig(machineId) {
         FROM machine_product mp
         LEFT JOIN product p ON mp.product_id = p.id
         WHERE mp.machine_id = @machineId
-          AND mp.product_id IS NOT NULL
         ORDER BY CAST(mp.position AS INT)
       `);
 
-    console.log(`✓ Found ${slotsResult.recordset.length} slots with products assigned\n`);
+    const slotsWithProducts = slotsResult.recordset.filter(s => s.product_id !== null).length;
+    const emptySlots = slotsResult.recordset.length - slotsWithProducts;
 
-    if (slotsResult.recordset.length === 0) {
-      console.error(`⚠️  Warning: Machine ${machineId} has no products assigned to slots!`);
-    }
+    console.log(`✓ Found ${slotsResult.recordset.length} total slots:`);
+    console.log(`  - ${slotsWithProducts} slots with products`);
+    console.log(`  - ${emptySlots} empty slots (will be cleared)\n`);
 
     // Convert to slot configuration format
+    // Empty slots (product_id IS NULL) will have empty productName and trigger clear
     const slots = slotsResult.recordset.map(slot => ({
       slotNumber: parseInt(slot.position),
-      productName: slot.product_name || `Product ${slot.product_id}`,
+      productName: slot.product_name || "",  // Empty string for slots without products
       machinePrice: slot.price || 0,
       userDefinedPrice: slot.price || 0,
-      capacity: 199,
-      existing: 199,
+      capacity: slot.product_id ? 199 : 0,  // 0 capacity for empty slots
+      existing: slot.product_id ? 199 : 0,  // 0 existing for empty slots
       weChatDiscount: 100,
       alipayDiscount: 100,
       idCardDiscount: 100,
